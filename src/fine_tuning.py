@@ -1,14 +1,18 @@
 """
 ÉTAPE 5 — Fine-Tuning : LoRA, QLoRA et Full Fine-Tuning.
 Adapte un LLM pré-entraîné au domaine spécifique du dataset.
+
+Exécution réelle : définir FINETUNE_RUN=1 (ex. sur Kaggle avec GPU).
+Sinon `run.py --step finetune` ne fait qu’afficher la config (mode sec).
 """
 import json
 import logging
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Dict, Optional
-from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
-from src.config import FINE_TUNING_CONFIG, MODELS_DIR, EVALUATION_DIR
+from src.config import BASE_DIR, EVALUATION_DIR, FINE_TUNING_CONFIG, MODELS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +144,7 @@ class FineTuner:
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
+            dataset_text_field="text",
             max_seq_length=train_cfg["max_seq_length"],
         )
 
@@ -234,6 +239,7 @@ class FineTuner:
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
+            dataset_text_field="text",
             max_seq_length=train_cfg["max_seq_length"],
         )
 
@@ -302,6 +308,7 @@ class FineTuner:
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
+            dataset_text_field="text",
             max_seq_length=train_cfg["max_seq_length"],
         )
 
@@ -322,3 +329,133 @@ class FineTuner:
             training_time_min=duration,
             model_path=str(output_path / "final"),
         )
+
+
+def build_hf_sft_dataset(dataset_rows: List[Dict], base_model_id: str):
+    """Construit un `datasets.Dataset` avec colonne `text` pour SFTTrainer."""
+    from datasets import Dataset
+    from transformers import AutoTokenizer
+
+    formatter = DatasetFormatter()
+    chat_rows = formatter.to_chat_format(dataset_rows)
+    tokenizer = AutoTokenizer.from_pretrained(base_model_id, trust_remote_code=True)
+    texts: List[str] = []
+    for row in chat_rows:
+        messages = row["messages"]
+        if getattr(tokenizer, "chat_template", None):
+            t = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=False,
+            )
+        else:
+            t = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
+        texts.append(t)
+    return Dataset.from_dict({"text": texts})
+
+
+def _train_val_split(ds, eval_ratio: float, seed: int):
+    """Découpe train / eval ; eval vide si trop peu d’exemples."""
+    n = len(ds)
+    if n < 2:
+        raise ValueError("Le fine-tuning requiert au moins 2 exemples.")
+    test_n = max(1, min(int(round(n * eval_ratio)), n - 1))
+    if test_n <= 0 or n - test_n < 1:
+        return ds, None
+    split = ds.train_test_split(test_size=test_n, seed=seed)
+    return split["train"], split["test"]
+
+
+def run_finetune_from_evaluation_dataset(
+    dataset_rows: List[Dict],
+    base_model_id: str,
+    method: str = "qlora",
+    eval_ratio: float = 0.1,
+    max_samples: Optional[int] = None,
+    seed: int = 42,
+) -> FineTuningResult:
+    """
+    Charge les Q/R, formate en texte SFT, entraîne LoRA / QLoRA / full, sauvegarde sous ``models/``.
+    """
+    if max_samples is not None and max_samples > 0:
+        dataset_rows = dataset_rows[:max_samples]
+
+    if len(dataset_rows) < 2:
+        raise ValueError(
+            f"Pas assez d'exemples pour entraîner ({len(dataset_rows)}). "
+            "Générez d'abord data/evaluation/dataset_evaluation.json (étape dataset)."
+        )
+
+    method = method.lower().strip()
+    if method not in ("qlora", "lora", "full"):
+        raise ValueError("FINETUNE_METHOD doit être qlora, lora ou full")
+
+    ds = build_hf_sft_dataset(dataset_rows, base_model_id)
+    train_ds, eval_ds = _train_val_split(ds, eval_ratio=eval_ratio, seed=seed)
+
+    tuner = FineTuner(base_model_id)
+    if method == "qlora":
+        result = tuner.train_qlora(train_ds, eval_dataset=eval_ds)
+    elif method == "lora":
+        result = tuner.train_lora(train_ds, eval_dataset=eval_ds)
+    else:
+        result = tuner.train_full(train_ds, eval_dataset=eval_ds)
+
+    save_finetune_manifest(
+        result,
+        extra={
+            "train_examples": len(train_ds),
+            "eval_examples": len(eval_ds) if eval_ds is not None else 0,
+            "eval_ratio": eval_ratio,
+            "seed": seed,
+            "max_samples_applied": max_samples,
+        },
+    )
+    return result
+
+
+def save_finetune_manifest(result: FineTuningResult, extra: Optional[Dict[str, Any]] = None) -> Path:
+    """Écrit ``data/evaluation/finetune_manifest.json`` (suivi + reprise en local)."""
+    path = EVALUATION_DIR / "finetune_manifest.json"
+    mp = Path(result.model_path).resolve()
+    base = BASE_DIR.resolve()
+    try:
+        adapter_rel = str(mp.relative_to(base))
+    except ValueError:
+        adapter_rel = str(mp)
+    payload: Dict[str, Any] = {
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        **asdict(result),
+        "adapter_path_project_relative": adapter_rel,
+        "continuer_en_local": {
+            "copier_vers_projet": [
+                f"Copier le dossier entier « models/ » (ou seulement {adapter_rel}) "
+                "à la racine du clone local du projet.",
+            ],
+            "charger_ladaptateur": (
+                "from transformers import AutoModelForCausalLM; from peft import PeftModel; "
+                f'base = AutoModelForCausalLM.from_pretrained("{result.base_model}", '
+                "trust_remote_code=True, torch_dtype='auto', device_map='auto'); "
+                f'model = PeftModel.from_pretrained(base, "{adapter_rel}")'
+            ),
+        },
+    }
+    if extra:
+        payload["run"] = extra
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    logger.info("Manifeste fine-tuning → %s", path)
+    return path
+
+
+def finetune_dry_run_summary(
+    dataset_rows: List[Dict],
+    base_model_id: str,
+) -> Dict[str, Any]:
+    """Résumé sans GPU (mode par défaut de l’étape finetune)."""
+    return {
+        "mode": "dry_run",
+        "base_model": base_model_id,
+        "num_examples": len(dataset_rows),
+        "hint": "Pour entraîner : FINETUNE_RUN=1 python run.py --step finetune (GPU requis pour qlora/lora).",
+    }

@@ -7,7 +7,7 @@ Usage :
     python run.py --step benchmark    # Étape 2 uniquement
     python run.py --step rag          # Étape 3 : RAG Simple
     python run.py --step rag-adv      # Étape 4 : RAG Avancé
-    python run.py --step finetune     # Étape 5 : Fine-Tuning
+    python run.py --step finetune     # Étape 5 : Fine-Tuning (FINETUNE_RUN=1 + GPU pour entraîner)
     python run.py --step raft         # Étape 6 : RAFT
     python run.py --step agent        # Étape 7 : RAG + Agent
     python run.py --step multi-agent  # Étape 8 : RAFT + Multi-Agent
@@ -16,6 +16,7 @@ Usage :
 """
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -154,12 +155,11 @@ def step_4_rag_advanced(llm=None):
 
 
 def step_5_finetune():
-    """Étape 5 : Fine-Tuning."""
+    """Étape 5 : Fine-Tuning (dry-run par défaut ; entraînement si FINETUNE_RUN=1 + GPU)."""
     logger.info("━" * 60)
     logger.info("ÉTAPE 5 — Fine-Tuning (LoRA / QLoRA)")
     logger.info("━" * 60)
 
-    from src.fine_tuning import FineTuner, DatasetFormatter
     from src.dataset_generator import DatasetGenerator
     from src.config import LLM_MODELS
 
@@ -170,18 +170,46 @@ def step_5_finetune():
         dataset = gen.generate_local_dataset()
         gen.save_dataset(dataset)
 
-    # Formater le dataset
-    formatter = DatasetFormatter()
-    formatted = formatter.to_chat_format(dataset)
+    base_model = (
+        os.getenv("FINETUNE_BASE_MODEL", "").strip()
+        or LLM_MODELS["qwen-7b"]["model_id"]
+    )
+    run_train = os.getenv("FINETUNE_RUN", "").strip().lower() in ("1", "true", "yes")
 
-    # Sélectionner le modèle open-source
-    base_model = LLM_MODELS["qwen-7b"]["model_id"]
-    tuner = FineTuner(base_model)
+    if not run_train:
+        from src.fine_tuning import FineTuner, DatasetFormatter, finetune_dry_run_summary
 
-    logger.info("Fine-tuning configuré. Lancez avec GPU pour exécuter.")
-    logger.info(f"  Modèle : {base_model}")
-    logger.info(f"  Dataset : {len(formatted)} exemples")
-    return tuner
+        formatter = DatasetFormatter()
+        formatted = formatter.to_chat_format(dataset)
+        FineTuner(base_model)  # vérifie création du dossier models/
+        summary = finetune_dry_run_summary(dataset, base_model)
+        logger.info("Mode sec (pas d’entraînement). %s", summary)
+        logger.info("  Exemples formatés : %s", len(formatted))
+        logger.info("  Pour lancer l’entraînement (GPU) : FINETUNE_RUN=1 python run.py --step finetune")
+        return summary
+
+    from src.fine_tuning import run_finetune_from_evaluation_dataset
+
+    method = os.getenv("FINETUNE_METHOD", "qlora").strip().lower()
+    max_s = os.getenv("FINETUNE_MAX_SAMPLES", "").strip()
+    max_samples = int(max_s) if max_s.isdigit() else None
+
+    logger.info("Entraînement actif — modèle=%s méthode=%s", base_model, method)
+    result = run_finetune_from_evaluation_dataset(
+        dataset_rows=dataset,
+        base_model_id=base_model,
+        method=method,
+        max_samples=max_samples,
+    )
+    logger.info(
+        "✅ Fine-tuning terminé — loss=%s eval_loss=%s durée=%.1f min → %s",
+        result.final_loss,
+        result.eval_loss,
+        result.training_time_min,
+        result.model_path,
+    )
+    logger.info("Manifeste : data/evaluation/finetune_manifest.json")
+    return result
 
 
 def step_6_raft():
