@@ -5,6 +5,7 @@ Adapte un LLM pré-entraîné au domaine spécifique du dataset.
 Exécution réelle : définir FINETUNE_RUN=1 (ex. sur Kaggle avec GPU).
 Sinon `run.py --step finetune` ne fait qu’afficher la config (mode sec).
 """
+import dataclasses
 import json
 import logging
 from dataclasses import asdict, dataclass
@@ -15,6 +16,106 @@ from typing import Any, Dict, List, Optional
 from src.config import BASE_DIR, EVALUATION_DIR, FINE_TUNING_CONFIG, MODELS_DIR
 
 logger = logging.getLogger(__name__)
+
+
+def _training_args_eval_kw(eval_dataset) -> Dict[str, str]:
+    """`eval_strategy` (transformers ≥ 4.46) ou `evaluation_strategy` (anciennes versions)."""
+    import inspect
+
+    from transformers import TrainingArguments
+
+    mode = "epoch" if eval_dataset else "no"
+    if "eval_strategy" in inspect.signature(TrainingArguments.__init__).parameters:
+        return {"eval_strategy": mode}
+    return {"evaluation_strategy": mode}
+
+
+def _sft_trainer_accepts_legacy_dataset_kwargs() -> bool:
+    """TRL ≤ 0.13 : `dataset_text_field` / `max_seq_length` sur SFTTrainer ; TRL récent : SFTConfig + processing_class."""
+    import inspect
+
+    from trl import SFTTrainer
+
+    return "dataset_text_field" in inspect.signature(SFTTrainer.__init__).parameters
+
+
+def _make_sft_trainer(
+    model,
+    tokenizer,
+    train_dataset,
+    eval_dataset,
+    output_dir: str,
+    train_cfg: dict,
+    *,
+    per_device_train_batch_size: Optional[int] = None,
+    learning_rate: Optional[float] = None,
+    warmup_steps: Optional[int] = None,
+    gradient_accumulation_steps: Optional[int] = None,
+):
+    """
+    Instancie SFTTrainer en fonction de la version de TRL / Transformers installée (ex. Kaggle vs requirements.txt).
+    """
+    from trl import SFTTrainer
+
+    bs = per_device_train_batch_size if per_device_train_batch_size is not None else train_cfg["batch_size"]
+    lr = learning_rate if learning_rate is not None else train_cfg["learning_rate"]
+    ws = warmup_steps if warmup_steps is not None else train_cfg["warmup_steps"]
+    gas = (
+        gradient_accumulation_steps
+        if gradient_accumulation_steps is not None
+        else train_cfg["gradient_accumulation_steps"]
+    )
+
+    common = {
+        "output_dir": output_dir,
+        "num_train_epochs": train_cfg["num_epochs"],
+        "per_device_train_batch_size": bs,
+        "learning_rate": lr,
+        "warmup_steps": ws,
+        "gradient_accumulation_steps": gas,
+        "fp16": True,
+        "logging_steps": 10,
+        "save_strategy": "epoch",
+        "report_to": "none",
+        **_training_args_eval_kw(eval_dataset),
+    }
+
+    if _sft_trainer_accepts_legacy_dataset_kwargs():
+        from transformers import TrainingArguments
+
+        training_args = TrainingArguments(**common)
+        return SFTTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=tokenizer,
+            dataset_text_field="text",
+            max_seq_length=train_cfg["max_seq_length"],
+        )
+
+    from trl import SFTConfig
+
+    sft_field_names = {f.name for f in dataclasses.fields(SFTConfig)}
+    seq_kw: Dict[str, int] = {}
+    # TRL récent : `max_length` ; TRL 0.13 : `max_seq_length`
+    if "max_length" in sft_field_names:
+        seq_kw["max_length"] = train_cfg["max_seq_length"]
+    elif "max_seq_length" in sft_field_names:
+        seq_kw["max_seq_length"] = train_cfg["max_seq_length"]
+
+    sft_args = SFTConfig(
+        **common,
+        dataset_text_field="text",
+        **seq_kw,
+    )
+    return SFTTrainer(
+        model=model,
+        args=sft_args,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        processing_class=tokenizer,
+    )
 
 
 @dataclass
@@ -83,13 +184,8 @@ class FineTuner:
     def train_lora(self, train_dataset, eval_dataset=None) -> FineTuningResult:
         """Fine-tuning avec LoRA (Low-Rank Adaptation)."""
         import torch
-        from transformers import (
-            AutoModelForCausalLM,
-            AutoTokenizer,
-            TrainingArguments,
-        )
+        from transformers import AutoModelForCausalLM, AutoTokenizer
         from peft import LoraConfig, get_peft_model, TaskType
-        from trl import SFTTrainer
 
         logger.info("=" * 60)
         logger.info("FINE-TUNING LoRA")
@@ -120,32 +216,15 @@ class FineTuner:
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
 
-        # Arguments d'entraînement
         train_cfg = self.config["training"]
         output_path = self.output_dir / "lora"
-        training_args = TrainingArguments(
-            output_dir=str(output_path),
-            num_train_epochs=train_cfg["num_epochs"],
-            per_device_train_batch_size=train_cfg["batch_size"],
-            learning_rate=train_cfg["learning_rate"],
-            warmup_steps=train_cfg["warmup_steps"],
-            gradient_accumulation_steps=train_cfg["gradient_accumulation_steps"],
-            fp16=True,
-            logging_steps=10,
-            save_strategy="epoch",
-            evaluation_strategy="epoch" if eval_dataset else "no",
-            report_to="none",
-        )
-
-        # Entraînement
-        trainer = SFTTrainer(
+        trainer = _make_sft_trainer(
             model=model,
-            args=training_args,
+            tokenizer=tokenizer,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
-            dataset_text_field="text",
-            max_seq_length=train_cfg["max_seq_length"],
+            output_dir=str(output_path),
+            train_cfg=train_cfg,
         )
 
         import time
@@ -171,14 +250,8 @@ class FineTuner:
     def train_qlora(self, train_dataset, eval_dataset=None) -> FineTuningResult:
         """Fine-tuning avec QLoRA (4-bit quantization + LoRA)."""
         import torch
-        from transformers import (
-            AutoModelForCausalLM,
-            AutoTokenizer,
-            BitsAndBytesConfig,
-            TrainingArguments,
-        )
+        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
         from peft import LoraConfig, get_peft_model, TaskType, prepare_model_for_kbit_training
-        from trl import SFTTrainer
 
         logger.info("=" * 60)
         logger.info("FINE-TUNING QLoRA (4-bit)")
@@ -219,28 +292,13 @@ class FineTuner:
 
         train_cfg = self.config["training"]
         output_path = self.output_dir / "qlora"
-        training_args = TrainingArguments(
-            output_dir=str(output_path),
-            num_train_epochs=train_cfg["num_epochs"],
-            per_device_train_batch_size=train_cfg["batch_size"],
-            learning_rate=train_cfg["learning_rate"],
-            warmup_steps=train_cfg["warmup_steps"],
-            gradient_accumulation_steps=train_cfg["gradient_accumulation_steps"],
-            fp16=True,
-            logging_steps=10,
-            save_strategy="epoch",
-            evaluation_strategy="epoch" if eval_dataset else "no",
-            report_to="none",
-        )
-
-        trainer = SFTTrainer(
+        trainer = _make_sft_trainer(
             model=model,
-            args=training_args,
+            tokenizer=tokenizer,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
-            dataset_text_field="text",
-            max_seq_length=train_cfg["max_seq_length"],
+            output_dir=str(output_path),
+            train_cfg=train_cfg,
         )
 
         import time
@@ -265,12 +323,7 @@ class FineTuner:
     def train_full(self, train_dataset, eval_dataset=None) -> FineTuningResult:
         """Full fine-tuning (tous les paramètres)."""
         import torch
-        from transformers import (
-            AutoModelForCausalLM,
-            AutoTokenizer,
-            TrainingArguments,
-        )
-        from trl import SFTTrainer
+        from transformers import AutoModelForCausalLM, AutoTokenizer
 
         logger.info("=" * 60)
         logger.info("FULL FINE-TUNING")
@@ -288,28 +341,17 @@ class FineTuner:
 
         train_cfg = self.config["training"]
         output_path = self.output_dir / "full_ft"
-        training_args = TrainingArguments(
-            output_dir=str(output_path),
-            num_train_epochs=train_cfg["num_epochs"],
-            per_device_train_batch_size=max(1, train_cfg["batch_size"] // 2),
-            learning_rate=train_cfg["learning_rate"] / 10,  # LR plus faible
-            warmup_steps=train_cfg["warmup_steps"] * 2,
-            gradient_accumulation_steps=train_cfg["gradient_accumulation_steps"] * 2,
-            fp16=True,
-            logging_steps=10,
-            save_strategy="epoch",
-            evaluation_strategy="epoch" if eval_dataset else "no",
-            report_to="none",
-        )
-
-        trainer = SFTTrainer(
+        trainer = _make_sft_trainer(
             model=model,
-            args=training_args,
+            tokenizer=tokenizer,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            tokenizer=tokenizer,
-            dataset_text_field="text",
-            max_seq_length=train_cfg["max_seq_length"],
+            output_dir=str(output_path),
+            train_cfg=train_cfg,
+            per_device_train_batch_size=max(1, train_cfg["batch_size"] // 2),
+            learning_rate=train_cfg["learning_rate"] / 10,
+            warmup_steps=train_cfg["warmup_steps"] * 2,
+            gradient_accumulation_steps=train_cfg["gradient_accumulation_steps"] * 2,
         )
 
         import time
