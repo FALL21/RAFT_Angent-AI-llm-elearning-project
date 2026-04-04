@@ -12,6 +12,7 @@ Usage (depuis la racine du projet) :
 
 Variables utiles :
     KAGGLE_SKIP_STEPS=0,1,...   # indices à sauter (voir _STEP_NAMES)
+    KAGGLE_FINETUNE_ONLY=1      # saute 0–4 et 6–8 : uniquement étape 5 (FINETUNE_RUN=1 requis)
     KAGGLE_DATASET_REGEN=0      # 1 pour régénérer dataset_evaluation.json (LLM)
 """
 from __future__ import annotations
@@ -33,6 +34,9 @@ logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
 )
+# PDFs « exportés » (Word, etc.) : milliers de lignes WARNING pypdf sans impact sur le texte extrait
+logging.getLogger("pypdf").setLevel(logging.ERROR)
+logging.getLogger("pypdf._reader").setLevel(logging.ERROR)
 logger = logging.getLogger("kaggle_experiment")
 
 EVAL_DIR = ROOT / "data" / "evaluation"
@@ -104,6 +108,9 @@ def _save_json(name: str, payload: dict) -> Path:
 
 
 def _parse_skip() -> set[int]:
+    if os.getenv("KAGGLE_FINETUNE_ONLY", "").strip().lower() in ("1", "true", "yes"):
+        # dataset_evaluation.json doit déjà exister (commit / dataset Kaggle / étape 1 passée avant).
+        return {0, 1, 2, 3, 4, 6, 7, 8}
     raw = os.getenv("KAGGLE_SKIP_STEPS", "").strip()
     if not raw:
         return set()

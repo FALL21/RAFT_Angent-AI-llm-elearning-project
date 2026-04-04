@@ -18,6 +18,49 @@ export KAGGLE_MAX_QUESTIONS_PER_EVAL=15
 python scripts/kaggle_full_experiment.py
 ```
 
+## Fine-tuning (entraînement QLoRA / LoRA) sur Kaggle
+
+L’étape 5 **prépare** toujours le JSONL ; l’**entraînement** ne part que si `FINETUNE_RUN=1`.
+
+### Prérequis
+
+1. **GPU** : dans le notebook Kaggle, *Settings* → **Accelerator** → **GPU** (T4 x2 ou mieux). Sans GPU, QLoRA/LoRA échouera ou sera extrêmement lent.
+2. **Token Hugging Face** : secret **`HUGGINGFACE_TOKEN`** (téléchargement de `Qwen/Qwen2.5-7B-Instruct` et dépendances).
+3. **Dataset** : fichier `data/evaluation/dataset_evaluation.json` présent (généré par l’étape 1 ou copié depuis ton dépôt / une sortie précédente).
+
+### Lancer tout le pipeline avec entraînement
+
+```bash
+cd /kaggle/working/RAFT_Angent-AI-llm-elearning-project   # ou le nom de ton clone
+export FINETUNE_RUN=1
+export FINETUNE_METHOD=qlora    # défaut si omis ; alternatives : lora, full (très lourd)
+# Optionnel : autre base (défaut = Qwen 2.5 7B Instruct)
+# export FINETUNE_BASE_MODEL=Qwen/Qwen2.5-7B-Instruct
+python scripts/kaggle_full_experiment.py
+```
+
+### Uniquement le fine-tuning (sans RAG / benchmark — économise quota API)
+
+Si `dataset_evaluation.json` est déjà là :
+
+```bash
+export FINETUNE_RUN=1
+export KAGGLE_FINETUNE_ONLY=1
+python scripts/kaggle_full_experiment.py
+```
+
+Équivalent : `export KAGGLE_SKIP_STEPS=0,1,2,3,4,6,7,8` avec `FINETUNE_RUN=1`.
+
+### Après l’entraînement
+
+- Adaptateur : dossier `models/qlora/final/` (ou `models/lora/final/`).
+- Métadonnées : `data/evaluation/finetune_manifest.json` et `kaggle_step05_finetune.json` (champ `training` si l’entraînement a tourné).
+- **Télécharge** `models/` et les JSON depuis l’onglet *Output* ou le panneau fichiers pour les réutiliser en local.
+
+### Si mémoire GPU insuffisante (OOM)
+
+Réduire la charge dans le code (`src/config.py`, bloc `FINE_TUNING_CONFIG` → `training.batch_size`, `max_seq_length`) ou tester `FINETUNE_METHOD=lora` sur une machine avec plus de VRAM. Sur T4 16 Go, **QLoRA + Qwen2.5-7B** est en général le bon compromis.
+
 Régénérer le dataset Q/R (LLM) même si le JSON existe déjà :
 
 ```bash
@@ -51,6 +94,16 @@ python scripts/kaggle_full_experiment.py
 ```
 
 Indices : `0` … `8` comme dans le tableau ci-dessus (alignés sur `_STEP_NAMES` du script).
+
+### Quota Hugging Face (HTTP 402)
+
+Si le routeur renvoie **402 Payment Required** (« monthly included credits depleted »), les appels LLM cessent d’être servis : le benchmark et le RAG **avancé** (plus d’appels par question) échouent vite, alors que le RAG **simple** peut encore partiellement réussir avant la coupure.
+
+**Pistes :** crédits prépayés ou abonnement sur [hf.co](https://huggingface.co), réduire `KAGGLE_MAX_QUESTIONS_PER_EVAL`, étaler les étapes sur plusieurs jours, ou utiliser **OpenAI** (`OPENAI_API_KEY` + `LLM_PROVIDER=openai` si tu as du quota).
+
+### Journaux pypdf (« Ignoring wrong pointing object »)
+
+Certains PDF exportés ont une table des objets imparfaite ; **pypdf** émet des avertissements mais l’extraction continue. Au démarrage, `kaggle_full_experiment.py` remonte le niveau des loggers `pypdf` / `pypdf._reader` à **ERROR** pour limiter le bruit dans la sortie Kaggle.
 
 ## Étape 6 « RAG + fine-tuning RAFT »
 
