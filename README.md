@@ -159,6 +159,10 @@ Le choix du LLM côté code passe par **`src/llm_factory.py`**.
 4. Onglet **Dataset** : **Générer depuis les PDFs** — le LLM crée des Q/R à partir des **chunks indexés** ; nombre de paires réglable (plafond côté API via `DATASET_PDF_MAX_PAIRS` ou corps JSON). Sans fichier JSON, l’API renvoie un dataset vide jusqu’à génération.
 5. Onglet **Benchmark** : résultats comparatifs après exécution du benchmark.
 
+### Kaggle — pipeline expérimental (0–8) et sauvegarde des résultats
+
+Voir **[docs/KAGGLE_EXPERIMENTS.md](docs/KAGGLE_EXPERIMENTS.md)** : script `scripts/kaggle_full_experiment.py` (base documentaire, Q/R, benchmark LLM, RAG simple / avancé / agent / multi-agent, fine-tuning, RAFT), fichiers JSON dans `data/evaluation/`.
+
 ### Ligne de commande
 
 ```bash
