@@ -37,6 +37,45 @@ logger = logging.getLogger("kaggle_experiment")
 
 EVAL_DIR = ROOT / "data" / "evaluation"
 
+
+def _inject_kaggle_secrets() -> None:
+    """
+    Sur Kaggle, `!python script.py` ne voit pas les variables posées dans une autre cellule Python.
+    On lit alors les Add-ons → Secrets (même noms que dans l’UI Kaggle).
+    """
+    has_hf = bool((os.getenv("HUGGINGFACE_TOKEN") or "").strip())
+    has_oai = bool((os.getenv("OPENAI_API_KEY") or "").strip())
+    if has_hf or has_oai:
+        return
+    try:
+        from kaggle_secrets import UserSecretsClient
+
+        client = UserSecretsClient()
+        for secret_name, env_name in (
+            ("HUGGINGFACE_TOKEN", "HUGGINGFACE_TOKEN"),
+            ("HF_TOKEN", "HUGGINGFACE_TOKEN"),
+            ("OPENAI_API_KEY", "OPENAI_API_KEY"),
+        ):
+            try:
+                val = (client.get_secret(secret_name) or "").strip()
+            except Exception:
+                val = ""
+            if val and not (os.getenv(env_name) or "").strip():
+                os.environ[env_name] = val
+                logger.info("Secret Kaggle injecté : %s → %s", secret_name, env_name)
+    except Exception as exc:
+        logger.debug("kaggle_secrets indisponible (%s)", exc)
+
+    if (os.getenv("HUGGINGFACE_TOKEN") or "").strip() and not (os.getenv("OPENAI_API_KEY") or "").strip():
+        os.environ.setdefault("LLM_PROVIDER", "huggingface")
+
+    if not (os.getenv("HUGGINGFACE_TOKEN") or "").strip() and not (os.getenv("OPENAI_API_KEY") or "").strip():
+        logger.warning(
+            "Aucune clé LLM dans l’environnement. Ajoutez le secret HUGGINGFACE_TOKEN dans Kaggle "
+            "(Add-ons → Secrets) ou exportez-la avant : os.environ['HUGGINGFACE_TOKEN']=..."
+        )
+
+
 _STEP_NAMES = [
     "00_knowledge_base",
     "01_qa_dataset",
@@ -338,6 +377,8 @@ def main():
         help="Forcer la régénération du dataset Q/R (étape 1)",
     )
     args = parser.parse_args()
+
+    _inject_kaggle_secrets()
 
     skip = _parse_skip()
     max_q = _max_questions()

@@ -4,10 +4,12 @@ Ce flux correspond à ton plan : base documentaire → Q/R → benchmarks LLM et
 
 ## Commande unique
 
-À la racine du projet (après `git pull`, PDFs dans `data/raw_pdfs/`, secret `HUGGINGFACE_TOKEN`) :
+À la racine du projet (après `git pull`, PDFs dans `data/raw_pdfs/`) :
+
+- **Secrets Kaggle** : créez un secret nommé exactement **`HUGGINGFACE_TOKEN`** (ou **`HF_TOKEN`**) dans *Add-ons → Secrets*. Le script `kaggle_full_experiment.py` les lit automatiquement au démarrage (même avec `!python`, qui ne voit pas les variables d’une autre cellule Python).
+- Sinon : `export HUGGINGFACE_TOKEN=...` dans le même shell que celui qui lance Python.
 
 ```bash
-export HUGGINGFACE_TOKEN=...   # ou via kaggle_secrets dans une cellule avant
 export KAGGLE_MAX_QUESTIONS_PER_EVAL=15
 # Optionnel : entraîner (long, GPU)
 # export FINETUNE_RUN=1
