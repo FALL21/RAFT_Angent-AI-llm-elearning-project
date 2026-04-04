@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RAG-LLM Multi-Agent — Interface</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+  </head>
+  <body>
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2><i class="fas fa-robot"></i> RAG-LLM</h2>
+        <p class="subtitle">Multi-Agent System</p>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" data-tab="chat">
+          <i class="fas fa-comments"></i> Chat
+        </button>
+        <button class="nav-btn" data-tab="upload">
+          <i class="fas fa-file-pdf"></i> Documents
+        </button>
+        <button class="nav-btn" data-tab="dataset">
+          <i class="fas fa-database"></i> Dataset
+        </button>
+        <button class="nav-btn" data-tab="benchmark">
+          <i class="fas fa-chart-bar"></i> Benchmark
+        </button>
+        <button class="nav-btn" data-tab="settings">
+          <i class="fas fa-cog"></i> Paramètres
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status" id="status">
+          <span class="status-dot"></span>
+          <span id="status-text">Prêt</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <!-- TAB: CHAT -->
+      <section class="tab-content active" id="tab-chat">
+        <div class="chat-header">
+          <h1>Assistant RAG Multi-Agent</h1>
+          <div class="pipeline-selector">
+            <label>Pipeline :</label>
+            <select id="pipeline-select">
+              <option value="rag_simple">RAG Simple</option>
+              <option value="rag_advanced">RAG Avancé</option>
+              <option value="rag_agent">RAG + Agent IA</option>
+              <option value="multi_agent" selected>RAFT + Multi-Agent</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+          <div class="message bot">
+            <div class="message-avatar"><i class="fas fa-robot"></i></div>
+            <div class="message-content message-content--bot">
+              <div class="message-body">
+                <p class="message-para">
+                  Bienvenue ! Je suis votre assistant RAG multi-agent.
+                </p>
+                <p class="message-para">
+                  Commencez par uploader vos PDFs dans l’onglet
+                  <strong class="message-strong">Documents</strong>, puis
+                  indexez-les pour pouvoir poser des questions.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-area">
+          <div class="input-wrapper">
+            <textarea
+              id="question-input"
+              placeholder="Posez votre question..."
+              rows="1"
+            ></textarea>
+            <button id="send-btn" class="send-btn">
+              <i class="fas fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: UPLOAD -->
+      <section class="tab-content" id="tab-upload">
+        <h1><i class="fas fa-file-pdf"></i> Gestion des Documents</h1>
+
+        <div class="upload-zone" id="upload-zone">
+          <i class="fas fa-cloud-upload-alt"></i>
+          <p>Glissez vos fichiers PDF ici</p>
+          <p class="small">ou cliquez pour sélectionner</p>
+          <input type="file" id="file-input" accept=".pdf" multiple hidden />
+        </div>
+
+        <div class="action-bar">
+          <button class="btn btn-primary" id="index-btn">
+            <i class="fas fa-database"></i> Indexer les documents
+          </button>
+          <button class="btn btn-secondary" id="refresh-pdfs">
+            <i class="fas fa-sync-alt"></i> Actualiser
+          </button>
+        </div>
+
+        <div class="pdf-list" id="pdf-list">
+          <h3>Documents disponibles</h3>
+          <ul id="pdf-items"></ul>
+        </div>
+      </section>
+
+      <!-- TAB: DATASET -->
+      <section class="tab-content" id="tab-dataset">
+        <h1><i class="fas fa-database"></i> Dataset d'Évaluation</h1>
+        <div class="action-bar">
+          <label class="dataset-max-label" for="dataset-max-pairs"
+            >Nombre de Q/R (max 300) :</label
+          >
+          <input
+            type="number"
+            id="dataset-max-pairs"
+            min="1"
+            max="300"
+            value="60"
+            class="dataset-max-input"
+          />
+          <button class="btn btn-primary" id="generate-dataset">
+            <i class="fas fa-plus"></i> Générer depuis les PDFs
+          </button>
+        </div>
+        <p class="hint">
+          Les questions sont produites par le LLM à partir des chunks des PDFs
+          indexés. Prévoir plusieurs minutes si vous augmentez le nombre.
+        </p>
+        <div class="dataset-stats" id="dataset-stats"></div>
+        <div class="dataset-table-wrapper">
+          <table class="dataset-table" id="dataset-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Domaine</th>
+                <th>Question</th>
+                <th>Réponse</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB: BENCHMARK -->
+      <section class="tab-content" id="tab-benchmark">
+        <h1><i class="fas fa-chart-bar"></i> Benchmark des LLMs</h1>
+        <div class="action-bar">
+          <label class="dataset-max-label" for="benchmark-max-q"
+            >Questions (échantillon) :</label
+          >
+          <input
+            type="number"
+            id="benchmark-max-q"
+            min="1"
+            max="100"
+            value="15"
+            class="dataset-max-input"
+          />
+          <button class="btn btn-primary" id="run-benchmark">
+            <i class="fas fa-play"></i> Lancer le benchmark
+          </button>
+        </div>
+        <p class="hint">
+          Évalue les modèles définis dans
+          <code>LLM_MODELS</code> (<code>src/config.py</code>) sur le dataset
+          JSON. Peut prendre plusieurs minutes et consommer des quotas API
+          (OpenAI / Hugging Face). À la fin, le <strong>gagnant</strong> est
+          appliqué au <strong>Chat</strong> (<code>HF_CHAT_MODEL_ID</code> +
+          <code>LLM_PROVIDER=huggingface</code> si un token HF est configuré).
+        </p>
+        <div class="benchmark-cards" id="benchmark-cards">
+          <p class="placeholder">
+            Chargez l’onglet ou lancez le benchmark pour voir les résultats.
+          </p>
+        </div>
+      </section>
+
+      <!-- TAB: SETTINGS -->
+      <section class="tab-content" id="tab-settings">
+        <h1><i class="fas fa-cog"></i> Paramètres</h1>
+        <p class="hint settings-intro">
+          Les valeurs sont enregistrées dans le fichier <code>.env</code> à la
+          racine du projet et appliquées tout de suite au serveur (redémarrage
+          non obligatoire). Laisser une clé vide lors de l’enregistrement la
+          conserve inchangée.
+        </p>
+        <p
+          id="settings-status"
+          class="settings-status"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <div class="settings-form">
+          <div class="setting-group">
+            <label for="llm-provider"
+              >Fournisseur LLM (<code>LLM_PROVIDER</code>)</label
+            >
+            <select id="llm-provider">
+              <option value="auto">
+                auto — OpenAI si clé présente, sinon Hugging Face
+              </option>
+              <option value="openai">openai</option>
+              <option value="huggingface">huggingface</option>
+            </select>
+          </div>
+          <div class="setting-group">
+            <label for="openai-key">Clé API OpenAI</label>
+            <input
+              type="password"
+              id="openai-key"
+              autocomplete="off"
+              placeholder="Laisser vide pour ne pas modifier"
+            />
+            <span class="field-hint" id="openai-key-hint"></span>
+          </div>
+          <div class="setting-group">
+            <label for="openai-chat-model">Modèle OpenAI (chat)</label>
+            <input
+              type="text"
+              id="openai-chat-model"
+              placeholder="gpt-4o-mini"
+              spellcheck="false"
+            />
+          </div>
+          <div class="setting-group">
+            <label for="hf-token">Token Hugging Face</label>
+            <input
+              type="password"
+              id="hf-token"
+              autocomplete="off"
+              placeholder="Laisser vide pour ne pas modifier"
+            />
+            <span class="field-hint" id="hf-token-hint"></span>
+          </div>
+          <div class="setting-group">
+            <label for="hf-chat-model"
+              >Modèle chat (routeur HF, <code>HF_CHAT_MODEL_ID</code>)</label
+            >
+            <input
+              type="text"
+              id="hf-chat-model"
+              spellcheck="false"
+              placeholder="Qwen/Qwen2.5-7B-Instruct"
+            />
+            <span class="field-hint"
+              >URL routeur : <code id="hf-router-url"></code
+            ></span>
+          </div>
+          <div class="setting-group">
+            <label
+              >Modèles benchmark (Hub, lecture seule — éditer
+              <code>.env</code> : <code>BENCHMARK_HF_MODEL_*</code>)</label
+            >
+            <pre class="settings-bench" id="benchmark-models-pre"></pre>
+          </div>
+          <div class="setting-group">
+            <label for="top-k"
+              >Top-K (documents récupérés, <code>RAG_TOP_K</code>)</label
+            >
+            <input type="number" id="top-k" min="1" max="20" value="5" />
+          </div>
+          <div class="setting-group">
+            <label for="chunk-size"
+              >Taille des chunks PDF (<code>CHUNK_SIZE</code>)</label
+            >
+            <input
+              type="number"
+              id="chunk-size"
+              min="128"
+              max="2048"
+              step="128"
+              value="512"
+            />
+            <span class="field-hint"
+              >Après changement : réindexer depuis l’onglet Documents.</span
+            >
+          </div>
+          <div class="setting-group settings-actions">
+            <button type="button" class="btn-primary" id="settings-save">
+              <i class="fas fa-save"></i> Enregistrer
+            </button>
+          </div>
+          <p class="hint settings-links">
+            Modèles Meta Llama (gated) : accepter la licence sur le Hub — ex.
+            <a
+              href="https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct"
+              target="_blank"
+              rel="noopener"
+              >Llama-3.1-8B-Instruct</a
+            >. Inference Providers :
+            <a
+              href="https://huggingface.co/settings/inference-providers"
+              target="_blank"
+              rel="noopener"
+              >paramètres HF</a
+            >. Tokens :
+            <a
+              href="https://platform.openai.com/api-keys"
+              target="_blank"
+              rel="noopener"
+              >OpenAI</a
+            >
+            ·
+            <a
+              href="https://huggingface.co/settings/tokens"
+              target="_blank"
+              rel="noopener"
+              >Hugging Face</a
+            >
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  </body>
+</html>

@@ -1,0 +1,58 @@
+{
+  "results": {
+    "qwen-7b": [
+      {
+        "model_name": "qwen-7b",
+        "domain": "documents",
+        "accuracy": 0.07692307692307693,
+        "f1_score": 0.15233077824574634,
+        "bleu_score": 0.015142567535737875,
+        "rouge_l": 0.10364094870500316,
+        "avg_latency_ms": 3840.171557206374,
+        "total_questions": 14,
+        "correct_answers": 1
+      }
+    ],
+    "mistral-7b": [
+      {
+        "model_name": "mistral-7b",
+        "domain": "échecs API (1/1)",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "bleu_score": 0.0,
+        "rouge_l": 0.0,
+        "avg_latency_ms": 0.0,
+        "total_questions": 1,
+        "correct_answers": 0
+      }
+    ],
+    "llama3-8b": [
+      {
+        "model_name": "llama3-8b",
+        "domain": "échecs API (1/1)",
+        "accuracy": 0.0,
+        "f1_score": 0.0,
+        "bleu_score": 0.0,
+        "rouge_l": 0.0,
+        "avg_latency_ms": 0.0,
+        "total_questions": 1,
+        "correct_answers": 0
+      }
+    ]
+  },
+  "best_model": {
+    "name": "qwen-7b",
+    "score": 0.10735576136559351,
+    "all_scores": {
+      "qwen-7b": 0.10735576136559351,
+      "mistral-7b": 0.1,
+      "llama3-8b": 0.1
+    }
+  },
+  "chat_alignment": {
+    "applied": true,
+    "benchmark_winner_key": "qwen-7b",
+    "hf_chat_model_id": "Qwen/Qwen2.5-7B-Instruct",
+    "llm_provider": "huggingface"
+  }
+}

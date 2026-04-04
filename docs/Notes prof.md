@@ -1,0 +1,1 @@
+0-Dataset de base de connaissance (in RAG) 1-generation de dataset questions-reponses 2-Evaluer LLM seul (claude) 3-evaluer (RAG (Claude+BD)) 4-evaluer (RAGoptimiser (Claude+BD)) 5-Fine tuning -Generation Question reponse Transformer le dataset le l etape 0 en question reponse -Train et evaluer avec le dataset du 1 6-evaluation (RAFT (RAG+Fine tuning (LLM+BD+Fine tuning)))

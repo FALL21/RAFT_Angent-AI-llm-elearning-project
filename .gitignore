@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Env
+venv/
+.venv/
+env/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data (too large for git)
+data/raw_pdfs/*.pdf
+data/processed/
+vectorstore/
+models/
+
+# Logs
+*.log
+
+# Docker
+docker/volumes/
+
+# OS
+.DS_Store
+Thumbs.db

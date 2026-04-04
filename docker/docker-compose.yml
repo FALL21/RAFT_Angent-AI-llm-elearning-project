@@ -1,0 +1,80 @@
+# ════════════════════════════════════════════════════════════
+# RAG-LLM Multi-Agent — Docker Compose
+# ════════════════════════════════════════════════════════════
+# Usage :
+#   docker-compose up --build          # Lancer le projet
+#   docker-compose up -d               # Lancer en arrière-plan
+#   docker-compose down                # Arrêter
+#   docker-compose logs -f app         # Voir les logs
+# ════════════════════════════════════════════════════════════
+
+version: "3.9"
+
+services:
+  # ── Application principale ────────────────────────────────
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: rag-llm-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ../data/raw_pdfs:/app/data/raw_pdfs         # PDFs sources
+      - ../data/evaluation:/app/data/evaluation       # Datasets
+      - ../vectorstore:/app/vectorstore               # Base vectorielle persistante
+      - ../models:/app/models                         # Modèles fine-tunés
+    env_file:
+      - ../.env
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=false
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - rag-network
+
+  # ── ChromaDB (base vectorielle externe — optionnel) ───────
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: rag-chromadb
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - ANONYMIZED_TELEMETRY=false
+      - IS_PERSISTENT=true
+    networks:
+      - rag-network
+
+  # ── Redis (cache des embeddings — optionnel) ──────────────
+  redis:
+    image: redis:7-alpine
+    container_name: rag-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - rag-network
+
+# ── Volumes persistants ────────────────────────────────────
+volumes:
+  chroma_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ── Réseau ──────────────────────────────────────────────────
+networks:
+  rag-network:
+    driver: bridge

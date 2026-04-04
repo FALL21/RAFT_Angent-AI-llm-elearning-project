@@ -1,0 +1,278 @@
+{
+  "metadata": {
+    "version": "1.1",
+    "generated_at": "2026-04-03T00:23:49.870510",
+    "total_questions": 22,
+    "domain": "documents",
+    "generation": "pdf_chunks",
+    "sub_domains": {
+      "B V3": 2,
+      "NLP-Deep learning (1)": 1,
+      "PRJ3": 2,
+      "Veille technologique": 3,
+      "Text_Mining_Sentiment_analysis": 4,
+      "NLP_0 (1)": 4,
+      "Cours Deep Learning": 2,
+      "Agrégations_et_Groupements_avec_Spark_SQL": 1,
+      "PRJ2": 2,
+      "Fondamentaux_de_Spark_SQL_et_DataFrames": 1
+    },
+    "pdf_sources": [
+      "Agrégations_et_Groupements_avec_Spark_SQL.pdf",
+      "B V3.pdf",
+      "Cours Deep Learning.pdf",
+      "Fondamentaux_de_Spark_SQL_et_DataFrames.pdf",
+      "NLP-Deep learning (1).pdf",
+      "NLP_0 (1).pdf",
+      "PRJ2.pdf",
+      "PRJ3.pdf",
+      "Text_Mining_Sentiment_analysis.pdf",
+      "Veille technologique.pdf"
+    ],
+    "max_pairs_requested": 100
+  },
+  "data": [
+    {
+      "id": "pdf_0000",
+      "domain": "documents",
+      "sub_domain": "B V3",
+      "question": "Quels sont les caractéristiques des problèmes simples en termes de contraintes et de prévision du temps ?",
+      "answer": "Les problèmes simples prennent en compte uniquement les contraintes d'antériorité et minimisent la date d'achèvement du projet. La durée peut être prédite avec une certitude élevée en raison de l'existence d'une expérience (i.e. historique) et d'une estimation unique du temps.",
+      "source_file": "B V3.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 1
+    },
+    {
+      "id": "pdf_0001",
+      "domain": "documents",
+      "sub_domain": "NLP-Deep learning (1)",
+      "question": "Qu'est-ce qu'un réseau de neurones récurrent et comment fonctionnent-ils ?",
+      "answer": "Les RNNs sont des architectures de réseaux neuronaux adaptées au traitement de données séquentielles grâce à leur capacité à conserver un « état caché » évoluant dans le temps. Ils possèdent des boucles rétroactives permettant de prendre en compte les informations précédentes.",
+      "source_file": "NLP-Deep learning (1).pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 2
+    },
+    {
+      "id": "pdf_0002",
+      "domain": "documents",
+      "sub_domain": "PRJ3",
+      "question": "Quels éléments peut-on modifier à ce niveau de l'interface ?",
+      "answer": "On peut modifier la Date d'état, le type ainsi que la couleur.",
+      "source_file": "PRJ3.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 3
+    },
+    {
+      "id": "pdf_0003",
+      "domain": "documents",
+      "sub_domain": "Veille technologique",
+      "question": "Quels sont les éléments clés mentionnés dans le passage concernant la théorie géométrique des lois d’échelle ?",
+      "answer": "Les éléments clés sont la relation taille-dimension, le rôle central de la superposition, le lien direct entre les toy models et les LLMs, et les prédictions vérifiées expérimentalement.",
+      "source_file": "Veille technologique.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 5
+    },
+    {
+      "id": "pdf_0004",
+      "domain": "documents",
+      "sub_domain": "Text_Mining_Sentiment_analysis",
+      "question": "Quelles caractéristiques doivent avoir les entrées pour être compatibles avec les outils de NLP ?",
+      "answer": "Elles doivent être tokenisées.",
+      "source_file": "Text_Mining_Sentiment_analysis.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 6
+    },
+    {
+      "id": "pdf_0005",
+      "domain": "documents",
+      "sub_domain": "NLP_0 (1)",
+      "question": "Quelle est la différence entre lemmatisation et stemming ?",
+      "answer": "Lemmatisation est un processus de conversion des mots à leur forme canonique basée sur le dictionnaire, qui permet d'obtenir la forme de base d'un mot en tenant compte du contexte grammatical. Elle est plus précise que le stemming et conserve le sens des mots.",
+      "source_file": "NLP_0 (1).pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 7
+    },
+    {
+      "id": "pdf_0006",
+      "domain": "documents",
+      "sub_domain": "Text_Mining_Sentiment_analysis",
+      "question": "Quelle est la fonction de la correction orthographique mentionnée dans le passage ?",
+      "answer": "La correction orthographique sert à corriger les erreurs de frappe et les fautes d’orthographe pour améliorer la qualité des données.",
+      "source_file": "Text_Mining_Sentiment_analysis.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 8
+    },
+    {
+      "id": "pdf_0007",
+      "domain": "documents",
+      "sub_domain": "Cours Deep Learning",
+      "question": "Quels sont les principaux caractéristiques des réseaux de neurones utilisés pour le traitement des données spatiales ?",
+      "answer": "Les réseaux de neurones utilisés pour le traitement des données spatiales utilisent des filtres de convolution, le partage de poids et des opérations de pooling. Ils exploitent l'invariance par translation et réduisent drastiquement le nombre de paramètres.",
+      "source_file": "Cours Deep Learning.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 11
+    },
+    {
+      "id": "pdf_0008",
+      "domain": "documents",
+      "sub_domain": "Text_Mining_Sentiment_analysis",
+      "question": "Quel est le but mentionné pour le Text Mining selon le passage ?",
+      "answer": "Le but mentionné pour le Text Mining est la compréhension de certains phénomènes et des prises de décision éclairées.",
+      "source_file": "Text_Mining_Sentiment_analysis.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 12
+    },
+    {
+      "id": "pdf_0009",
+      "domain": "documents",
+      "sub_domain": "Veille technologique",
+      "question": "Qu'est-ce que la superposition en termes de neurones et de vecteurs de représentation ?",
+      "answer": "La superposition signifie que plusieurs features partagent les mêmes neurones et que les vecteurs de représentation ne sont plus orthogonaux. Il existe deux régimes de superposition : faible superposition et forte superposition.",
+      "source_file": "Veille technologique.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 14
+    },
+    {
+      "id": "pdf_0010",
+      "domain": "documents",
+      "sub_domain": "Veille technologique",
+      "question": "Quelles distributions ont été testées pour évaluer la robustesse des modèles ?",
+      "answer": "Les distributions exponentielle, power-law, et linéaire ont été testées.",
+      "source_file": "Veille technologique.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 15
+    },
+    {
+      "id": "pdf_0011",
+      "domain": "documents",
+      "sub_domain": "NLP_0 (1)",
+      "question": "Quel est le rôle de l'aidant dans le contexte de la capture de signification des termes complexes ?",
+      "answer": "L'aidant a pour rôle de capturer la signification plus précise des termes complexes.",
+      "source_file": "NLP_0 (1).pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 16
+    },
+    {
+      "id": "pdf_0012",
+      "domain": "documents",
+      "sub_domain": "Agrégations_et_Groupements_avec_Spark_SQL",
+      "question": "Quels sont les avantages de l'utilisation de la fonction agg() pour calculer plusieurs métriques en une fois ?",
+      "answer": "Plusieurs métriques sont calculées en une fois. Cela offre une meilleure performance car il n'y a qu'un seul shuffle pour tous les calculs. De plus, cela améliore la lisibilité en centralisant la logique d'agrégation.",
+      "source_file": "Agrégations_et_Groupements_avec_Spark_SQL.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 17
+    },
+    {
+      "id": "pdf_0013",
+      "domain": "documents",
+      "sub_domain": "Text_Mining_Sentiment_analysis",
+      "question": "Quelle est la date de cette lettre ?",
+      "answer": "January 30, 2026.",
+      "source_file": "Text_Mining_Sentiment_analysis.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 18
+    },
+    {
+      "id": "pdf_0014",
+      "domain": "documents",
+      "sub_domain": "PRJ2",
+      "question": "Quel est le nom de la personne mentionnée dans le passage ?",
+      "answer": "Mamadou DIAHAME",
+      "source_file": "PRJ2.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 20
+    },
+    {
+      "id": "pdf_0015",
+      "domain": "documents",
+      "sub_domain": "B V3",
+      "question": "Qu'est-ce que la marge libre dans un projet ?",
+      "answer": "La marge libre correspond à la durée dont une tâche peut être prolongée ou retardée sans déplacer aucune autre tâche du projet. Elle est une partie de la marge totale et un retard de la programmation de la tâche par rapport à une programmation au plus tôt n’a aucune conséquence tant qu’il n’excède pas la marge libre.",
+      "source_file": "B V3.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 21
+    },
+    {
+      "id": "pdf_0016",
+      "domain": "documents",
+      "sub_domain": "PRJ3",
+      "question": "Qu'est-ce que la planification initiale enregistre et comment est-elle représentée ?",
+      "answer": "La planification initiale enregistre les dates de début et de fin de chaque tâche les représentant comme étant ce qui a été prévue.",
+      "source_file": "PRJ3.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 22
+    },
+    {
+      "id": "pdf_0017",
+      "domain": "documents",
+      "sub_domain": "Cours Deep Learning",
+      "question": "Quels sont les paramètres d'Adam et quel est son usage principal ?",
+      "answer": "Les paramètres d'Adam sont alpha = 10^-3, beta1 = 0.9, beta2 = 0.999, epsilon = 10^-8. Son usage principal est d'être le standard actuel pour l'entraînement des réseaux profonds en raison de sa robustesse.",
+      "source_file": "Cours Deep Learning.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 23
+    },
+    {
+      "id": "pdf_0018",
+      "domain": "documents",
+      "sub_domain": "NLP_0 (1)",
+      "question": "Quelles sont les sections principales mentionnées dans le plan ?",
+      "answer": "Les sections principales mentionnées dans le plan sont l'introduction, le preprocessing et le modèle de langue.",
+      "source_file": "NLP_0 (1).pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 24
+    },
+    {
+      "id": "pdf_0019",
+      "domain": "documents",
+      "sub_domain": "NLP_0 (1)",
+      "question": "Quel est l'objectif principal de l'Understanding du Langage Naturel (NLU) ?",
+      "answer": "L'objectif principal de l'Understanding du Langage Naturel (NLU) est l'analyse sémantique et l'extraction d'entités pour comprendre le sens du texte écrit.",
+      "source_file": "NLP_0 (1).pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 25
+    },
+    {
+      "id": "pdf_0020",
+      "domain": "documents",
+      "sub_domain": "PRJ2",
+      "question": "Quelles sont les deux types de contraintes flexibles mentionnées dans le passage ?",
+      "answer": "Les deux types de contraintes flexibles mentionnées sont Dés Que Possible (DQP) et Le Plus Tard Possible (LPTP).",
+      "source_file": "PRJ2.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 26
+    },
+    {
+      "id": "pdf_0021",
+      "domain": "documents",
+      "sub_domain": "Fondamentaux_de_Spark_SQL_et_DataFrames",
+      "question": "Quel est le niveau d'étudiants pour lequel est destiné ce module ?",
+      "answer": "Le niveau des étudiants pour lequel est destiné ce module est Master & DIC.",
+      "source_file": "Fondamentaux_de_Spark_SQL_et_DataFrames.pdf",
+      "source": "pdf_chunk",
+      "difficulty": "moyen",
+      "variant": 27
+    }
+  ]
+}
