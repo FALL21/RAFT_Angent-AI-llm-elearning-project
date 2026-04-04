@@ -228,9 +228,11 @@ def steps_03_04_07_08_rag_family(max_q: int, skip: set[int]) -> dict:
     if 3 not in skip:
         logger.info("Évaluation RAG simple…")
         ev.evaluate_pipeline(SimpleRAG(llm=llm, vector_store=vs), "rag_simple", ds)
-        files["03"] = _save_json(
-            "kaggle_step03_rag_simple.json",
-            {"step": "3", "title": "RAG simple", "summary": ev.results["rag_simple"]["summary"]},
+        files["03"] = str(
+            _save_json(
+                "kaggle_step03_rag_simple.json",
+                {"step": "3", "title": "RAG simple", "summary": ev.results["rag_simple"]["summary"]},
+            )
         )
 
     if 4 not in skip:
@@ -240,17 +242,21 @@ def steps_03_04_07_08_rag_family(max_q: int, skip: set[int]) -> dict:
             "rag_advanced",
             ds,
         )
-        files["04"] = _save_json(
-            "kaggle_step04_rag_advanced.json",
-            {"step": "4", "title": "RAG optimisé", "summary": ev.results["rag_advanced"]["summary"]},
+        files["04"] = str(
+            _save_json(
+                "kaggle_step04_rag_advanced.json",
+                {"step": "4", "title": "RAG optimisé", "summary": ev.results["rag_advanced"]["summary"]},
+            )
         )
 
     if 7 not in skip:
         logger.info("Évaluation RAG + agent…")
         ev.evaluate_pipeline(RAGAgent(llm=llm, vector_store=vs), "rag_agent", ds)
-        files["07"] = _save_json(
-            "kaggle_step07_rag_agent.json",
-            {"step": "7", "title": "RAG + agent IA", "summary": ev.results["rag_agent"]["summary"]},
+        files["07"] = str(
+            _save_json(
+                "kaggle_step07_rag_agent.json",
+                {"step": "7", "title": "RAG + agent IA", "summary": ev.results["rag_agent"]["summary"]},
+            )
         )
 
     if 8 not in skip:
@@ -260,9 +266,11 @@ def steps_03_04_07_08_rag_family(max_q: int, skip: set[int]) -> dict:
             "rag_multi_agent",
             ds,
         )
-        files["08"] = _save_json(
-            "kaggle_step08_rag_multi_agent.json",
-            {"step": "8", "title": "RAG + multi-agent", "summary": ev.results["rag_multi_agent"]["summary"]},
+        files["08"] = str(
+            _save_json(
+                "kaggle_step08_rag_multi_agent.json",
+                {"step": "8", "title": "RAG + multi-agent", "summary": ev.results["rag_multi_agent"]["summary"]},
+            )
         )
 
     report_path = EVAL_DIR / "kaggle_rag_family_report.json"
@@ -420,8 +428,9 @@ def main():
             rag_files = steps_03_04_07_08_rag_family(max_q, skip)
             index["rag_outputs"] = rag_files
             for v in rag_files.values():
-                if v not in index["output_files"]:
-                    index["output_files"].append(v)
+                sv = str(v)
+                if sv not in index["output_files"]:
+                    index["output_files"].append(sv)
 
         if 5 not in skip:
             p = EVAL_DIR / "kaggle_step05_finetune.json"
@@ -431,8 +440,8 @@ def main():
                 index["output_files"].append(str(EVAL_DIR / "finetune_manifest.json"))
 
         if 6 not in skip:
-            p = _save_json("kaggle_step06_raft.json", step_06_raft(full_dataset))
-            index["output_files"].append(str(p))
+            step_06_raft(full_dataset)
+            index["output_files"].append(str(EVAL_DIR / "kaggle_step06_raft.json"))
             rp = EVAL_DIR / "raft_dataset.jsonl"
             if rp.is_file():
                 index["output_files"].append(str(rp))
@@ -441,7 +450,7 @@ def main():
         index["finished_at"] = _utc_now()
         manifest_path = EVAL_DIR / "kaggle_experiment_index.json"
         with open(manifest_path, "w", encoding="utf-8") as f:
-            json.dump(index, f, ensure_ascii=False, indent=2)
+            json.dump(index, f, ensure_ascii=False, indent=2, default=str)
         logger.info("Index global → %s", manifest_path)
 
     return 0
