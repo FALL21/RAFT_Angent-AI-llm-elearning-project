@@ -4,10 +4,14 @@ Adapte un LLM pré-entraîné au domaine spécifique du dataset.
 
 Exécution réelle : définir FINETUNE_RUN=1 (ex. sur Kaggle avec GPU).
 Sinon `run.py --step finetune` ne fait qu’afficher la config (mode sec).
+
+Multi-GPU : par défaut le modèle est chargé sur cuda:0 seul pour éviter les erreurs de device avec QLoRA ;
+FINETUNE_DEVICE_MAP=auto pour forcer le sharding.
 """
 import dataclasses
 import json
 import logging
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +20,35 @@ from typing import Any, Dict, List, Optional
 from src.config import BASE_DIR, EVALUATION_DIR, FINE_TUNING_CONFIG, MODELS_DIR
 
 logger = logging.getLogger(__name__)
+
+
+def _finetune_device_map():
+    """
+    Carte des devices pour `from_pretrained` pendant l'entraînement.
+
+    Avec `device_map="auto"` et 2+ GPU (ex. Kaggle T4×2), le modèle est étalé sur plusieurs cartes ;
+    la loss causal LM + PEFT peut alors mélanger cuda:0 et cuda:1 → RuntimeError.
+    Par défaut : tout sur `cuda:0` dès qu'il y a plusieurs GPU.
+    """
+    import torch
+
+    raw = (os.getenv("FINETUNE_DEVICE_MAP") or "").strip().lower()
+    if raw == "auto":
+        return "auto"
+    if raw in ("single", "0", "cuda0"):
+        return {"": 0}
+    if raw.isdigit():
+        return {"": int(raw)}
+    if os.getenv("FINETUNE_MULTI_GPU", "").strip().lower() in ("1", "true", "yes"):
+        return "auto"
+    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+        logger.info(
+            "Fine-tuning : %d GPU(s) détecté(s) — chargement du modèle sur cuda:0 uniquement "
+            "(QLoRA/PEFT). Pour forcer le sharding multi-GPU : FINETUNE_DEVICE_MAP=auto.",
+            torch.cuda.device_count(),
+        )
+        return {"": 0}
+    return "auto"
 
 
 def _training_args_eval_kw(eval_dataset) -> Dict[str, str]:
@@ -198,7 +231,7 @@ class FineTuner:
         model = AutoModelForCausalLM.from_pretrained(
             self.base_model_id,
             torch_dtype=torch.float16,
-            device_map="auto",
+            device_map=_finetune_device_map(),
             trust_remote_code=True,
         )
 
@@ -273,7 +306,7 @@ class FineTuner:
         model = AutoModelForCausalLM.from_pretrained(
             self.base_model_id,
             quantization_config=bnb_config,
-            device_map="auto",
+            device_map=_finetune_device_map(),
             trust_remote_code=True,
         )
         model = prepare_model_for_kbit_training(model)
@@ -335,7 +368,7 @@ class FineTuner:
         model = AutoModelForCausalLM.from_pretrained(
             self.base_model_id,
             torch_dtype=torch.float16,
-            device_map="auto",
+            device_map=_finetune_device_map(),
             trust_remote_code=True,
         )
 

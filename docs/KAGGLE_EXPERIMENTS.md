@@ -61,6 +61,10 @@ python scripts/kaggle_full_experiment.py
 
 Réduire la charge dans le code (`src/config.py`, bloc `FINE_TUNING_CONFIG` → `training.batch_size`, `max_seq_length`) ou tester `FINETUNE_METHOD=lora` sur une machine avec plus de VRAM. Sur T4 16 Go, **QLoRA + Qwen2.5-7B** est en général le bon compromis.
 
+### Plusieurs GPU (Kaggle T4×2) — erreur `cuda:0` / `cuda:1`
+
+Avec `device_map="auto"`, le modèle peut être réparti sur deux cartes et la loss PEFT/QLoRA plante (`Expected all tensors to be on the same device`). Par défaut, `src/fine_tuning.py` charge tout sur **`cuda:0`** dès qu’il détecte plusieurs GPU. Pour revenir à l’ancien comportement : `FINETUNE_DEVICE_MAP=auto` (ou `FINETUNE_MULTI_GPU=1`).
+
 Régénérer le dataset Q/R (LLM) même si le JSON existe déjà :
 
 ```bash
