@@ -24,7 +24,7 @@ L’étape 5 **prépare** toujours le JSONL ; l’**entraînement** ne part que 
 
 ### Prérequis
 
-1. **GPU** : dans le notebook Kaggle, *Settings* → **Accelerator** → **GPU** (T4 x2 ou mieux). Sans GPU, QLoRA/LoRA échouera ou sera extrêmement lent.
+1. **GPU** : dans le notebook Kaggle, *Settings* → **Accelerator** → **GPU** (idéalement **T4** x2). Sans GPU, QLoRA/LoRA échouera ou sera extrêmement lent.
 2. **Token Hugging Face** : secret **`HUGGINGFACE_TOKEN`** (téléchargement de `Qwen/Qwen2.5-7B-Instruct` et dépendances).
 3. **Dataset** : fichier `data/evaluation/dataset_evaluation.json` présent (généré par l’étape 1 ou copié depuis ton dépôt / une sortie précédente).
 
@@ -65,6 +65,8 @@ Réduire la charge dans le code (`src/config.py`, bloc `FINE_TUNING_CONFIG` → 
 
 Avec `device_map="auto"`, le modèle peut être réparti sur deux cartes et la loss PEFT/QLoRA plante (`Expected all tensors to be on the same device`). Par défaut, `src/fine_tuning.py` charge tout sur **`cuda:0`** dès qu’il détecte plusieurs GPU. Pour revenir à l’ancien comportement : `FINETUNE_DEVICE_MAP=auto` (ou `FINETUNE_MULTI_GPU=1`).
 
+Avec **T4×2** et un seul processus Python, le `Trainer` peut en plus enrouler le modèle en **`torch.nn.DataParallel`**, ce qui casse PEFT (ex. `RuntimeError: chunk expects at least a 1-dimensional tensor`). Le code force **`args._n_gpu = 1`** avant l’entraînement pour éviter ce chemin. Pour réactiver l’ancien comportement (déconseillé ici) : `FINETUNE_ALLOW_DATAPARALLEL=1`.
+
 ### `no kernel image` / bitsandbytes (QLoRA)
 
 Si le chargement 4-bit échoue avec **`CUDA error: no kernel image is available for execution on the device`**, le paquet **bitsandbytes** livré avec l’image ne correspond pas au GPU / au CUDA du notebook.
@@ -80,6 +82,20 @@ Puis redémarrer le kernel si Kaggle le demande, ou relancer la session.
 2. **Sans QLoRA** : `FINETUNE_METHOD=lora` (modèle en FP16 — plus gourmand en VRAM ; réduire `batch_size` / `max_seq_length` dans `src/config.py` si OOM).
 
 3. **Repli auto** : `FINETUNE_QLORA_FALLBACK_LORA=1` avec `FINETUNE_METHOD=qlora` : en cas d’échec 4-bit, le script enchaîne en **LoRA FP16** (même dataset, adaptateur sous `models/lora/final/`).
+
+### Tesla P100 (sm_60) — incompatible avec PyTorch CUDA 12 (Kaggle)
+
+Kaggle attribue parfois un **Tesla P100** (capability **6.0**). Les images récentes embarquent **PyTorch 2.x + CUDA 12**, qui ne ciblent que **sm_70+** (T4, V100, A100…). Tu verras des avertissements du type *« P100 … is not compatible with the current PyTorch installation »*, puis souvent **`named symbol not found`** dans bitsandbytes ou **`no kernel image`**.
+
+**Ce n’est pas corrigible** par `pip install -U bitsandbytes` : le problème vient de PyTorch + GPU.
+
+**À faire :**
+
+- Relancer une session / un autre notebook en espérant un **GPU T4** (ou utiliser un service avec GPU Volta+).
+- Ou entraîner **en local / ailleurs** avec un GPU récent.
+- Option expérimentale : réinstaller un **PyTorch ancien + CUDA 11.x** incluant sm_60 (lourd, fragile sur Kaggle).
+
+Le script `run_finetune_from_evaluation_dataset` **refuse** désormais ce cas (avant téléchargement lourd du modèle) avec un message explicite. Pour ignorer le garde-fou (échec probable) : `FINETUNE_ALLOW_SM60=1`.
 
 Régénérer le dataset Q/R (LLM) même si le JSON existe déjà :
 

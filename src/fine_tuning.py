@@ -7,6 +7,8 @@ Sinon `run.py --step finetune` ne fait qu’afficher la config (mode sec).
 
 Multi-GPU : par défaut le modèle est chargé sur cuda:0 seul pour éviter les erreurs de device avec QLoRA ;
 FINETUNE_DEVICE_MAP=auto pour forcer le sharding.
+Avec 2+ GPU visibles et un seul processus, le Trainer HF enroule sinon le modèle en DataParallel (incompatible PEFT) :
+on force args._n_gpu=1 (désactiver : FINETUNE_ALLOW_DATAPARALLEL=1).
 """
 import dataclasses
 import json
@@ -23,10 +25,10 @@ logger = logging.getLogger(__name__)
 
 _BNB_QLORA_FAIL_HINT = (
     "QLoRA (bitsandbytes 4-bit) a échoué sur ce GPU/CUDA. "
-    "Sur Kaggle, exécute avant le script : !pip install -U 'bitsandbytes>=0.45.0' "
-    "(ou une version alignée sur le CUDA du notebook). "
-    "Sinon : os.environ['FINETUNE_METHOD']='lora' (FP16, besoin de plus de VRAM) "
-    "ou FINETUNE_QLORA_FALLBACK_LORA=1 pour basculer automatiquement en LoRA."
+    "Si le GPU est P100 (sm_60) avec PyTorch CUDA 12, ce n’est pas réparable par pip : "
+    "il faut un GPU sm_70+ (ex. T4 sur Kaggle). "
+    "Sinon sur Kaggle : !pip install -U 'bitsandbytes>=0.45.0'. "
+    "Ou FINETUNE_METHOD=lora / FINETUNE_QLORA_FALLBACK_LORA=1 (FP16, plus de VRAM)."
 )
 
 
@@ -37,6 +39,42 @@ def _is_bnb_cuda_kernel_failure(exc: BaseException) -> bool:
         or "cudaerror" in text
         or "kernel image" in text
         or "acceleratorerror" in text
+        or "named symbol not found" in text
+    )
+
+
+def _finetune_gpu_sm60_vs_torch_cuda12_message() -> Optional[str]:
+    """
+    PyTorch officiel CUDA 12.x : noyaux sm_70+ seulement — P100 / GTX 10xx (sm_60) incompatible.
+    Évite un téléchargement multi-Go puis l’échec bitsandbytes (« named symbol not found »).
+    """
+    import torch
+
+    if not torch.cuda.is_available():
+        return None
+    if os.getenv("FINETUNE_ALLOW_SM60", "").strip().lower() in ("1", "true", "yes"):
+        return None
+    maj, mino = torch.cuda.get_device_capability()
+    if (maj, mino) >= (7, 0):
+        return None
+    cuda_s = (getattr(torch.version, "cuda", None) or "").strip()
+    if not cuda_s:
+        return None
+    try:
+        cu_major = int(cuda_s.split(".")[0])
+    except ValueError:
+        return None
+    if cu_major < 12:
+        return None
+    name = torch.cuda.get_device_name(0)
+    return (
+        f"GPU incompatible avec ce PyTorch : {name} (capability {maj}.{mino}, sm_{maj}{mino}). "
+        f"PyTorch {torch.__version__} (CUDA {cuda_s}) ne fournit des kernels GPU que pour sm_70+ "
+        f"(Volta, Turing, Ampere…). Un Tesla P100 / GTX 10xx provoque des erreurs CUDA ou bitsandbytes "
+        f"(ex. « named symbol not found », « no kernel image »). "
+        f"Sur Kaggle : obtiens un accélérateur **T4** (ou mieux), pas P100. "
+        f"Pour forcer quand même (échec probable) : FINETUNE_ALLOW_SM60=1. "
+        f"Voir docs/KAGGLE_EXPERIMENTS.md — Tesla P100."
     )
 
 
@@ -67,6 +105,25 @@ def _finetune_device_map():
         )
         return {"": 0}
     return "auto"
+
+
+def _avoid_hf_trainer_dataparallel_peft(trainer) -> None:
+    """
+    Un seul processus + plusieurs GPU visibles : Hugging Face enroule le modèle dans ``nn.DataParallel``,
+    ce qui casse PEFT / QLoRA (ex. ``RuntimeError: chunk expects at least a 1-dimensional tensor``).
+    Le chargement utilise déjà un seul device via ``device_map`` ; on aligne le Trainer sur un GPU.
+    """
+    import torch
+
+    if os.getenv("FINETUNE_ALLOW_DATAPARALLEL", "").strip().lower() in ("1", "true", "yes"):
+        return
+    if not torch.cuda.is_available() or torch.cuda.device_count() <= 1:
+        return
+    setattr(trainer.args, "_n_gpu", 1)
+    logger.info(
+        "Fine-tuning : %d GPU(s) visibles — args._n_gpu=1 pour éviter DataParallel (PEFT/QLoRA).",
+        torch.cuda.device_count(),
+    )
 
 
 def _training_args_eval_kw(eval_dataset) -> Dict[str, str]:
@@ -277,6 +334,7 @@ class FineTuner:
             output_dir=str(output_path),
             train_cfg=train_cfg,
         )
+        _avoid_hf_trainer_dataparallel_peft(trainer)
 
         import time
         start = time.time()
@@ -364,6 +422,7 @@ class FineTuner:
             output_dir=str(output_path),
             train_cfg=train_cfg,
         )
+        _avoid_hf_trainer_dataparallel_peft(trainer)
 
         import time
         start = time.time()
@@ -417,6 +476,7 @@ class FineTuner:
             warmup_steps=train_cfg["warmup_steps"] * 2,
             gradient_accumulation_steps=train_cfg["gradient_accumulation_steps"] * 2,
         )
+        _avoid_hf_trainer_dataparallel_peft(trainer)
 
         import time
         start = time.time()
@@ -495,6 +555,10 @@ def run_finetune_from_evaluation_dataset(
     method = method.lower().strip()
     if method not in ("qlora", "lora", "full"):
         raise ValueError("FINETUNE_METHOD doit être qlora, lora ou full")
+
+    msg_gpu = _finetune_gpu_sm60_vs_torch_cuda12_message()
+    if msg_gpu:
+        raise RuntimeError(msg_gpu)
 
     ds = build_hf_sft_dataset(dataset_rows, base_model_id)
     train_ds, eval_ds = _train_val_split(ds, eval_ratio=eval_ratio, seed=seed)
