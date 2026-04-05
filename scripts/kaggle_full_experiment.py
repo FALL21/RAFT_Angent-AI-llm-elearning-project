@@ -13,6 +13,7 @@ Usage (depuis la racine du projet) :
 Variables utiles :
     KAGGLE_SKIP_STEPS=0,1,...   # indices à sauter (voir _STEP_NAMES)
     KAGGLE_FINETUNE_ONLY=1      # saute 0–4 et 6–8 : uniquement étape 5 (FINETUNE_RUN=1 requis)
+    KAGGLE_ZIP_FINETUNE_EXPORT=1 # après QLoRA/LoRA : crée kaggle_finetune_export.zip (téléchargement UI sans API)
     KAGGLE_DATASET_REGEN=0      # 1 pour régénérer dataset_evaluation.json (LLM)
 """
 from __future__ import annotations
@@ -22,6 +23,7 @@ import json
 import logging
 import os
 import sys
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -40,6 +42,41 @@ logging.getLogger("pypdf._reader").setLevel(logging.ERROR)
 logger = logging.getLogger("kaggle_experiment")
 
 EVAL_DIR = ROOT / "data" / "evaluation"
+
+
+def _zip_finetune_export(adapter_path: str) -> None:
+    """
+    Archive adaptateur + JSON d’évaluation à la racine du projet pour téléchargement depuis le panneau
+    fichiers Kaggle (évite les 404 de l’API ``kernels output`` / ``kagglehub``).
+    """
+    if os.getenv("KAGGLE_ZIP_FINETUNE_EXPORT", "").strip().lower() not in ("1", "true", "yes"):
+        return
+    root = ROOT.resolve()
+    adapter = Path(adapter_path).resolve()
+    if not adapter.exists():
+        logger.warning("ZIP finetuning : dossier adaptateur introuvable (%s)", adapter)
+        return
+    zip_path = root / "kaggle_finetune_export.zip"
+    extras = [
+        EVAL_DIR / "finetune_manifest.json",
+        EVAL_DIR / "kaggle_step05_finetune.json",
+        EVAL_DIR / "kaggle_step05a_finetune_chat_format.jsonl",
+    ]
+    try:
+        zip_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in extras:
+            if p.is_file():
+                zf.write(p, arcname=str(p.relative_to(root)))
+        if adapter.is_file():
+            zf.write(adapter, arcname=str(adapter.relative_to(root)))
+        elif adapter.is_dir():
+            for f in adapter.rglob("*"):
+                if f.is_file():
+                    zf.write(f, arcname=str(f.relative_to(root)))
+    logger.info("ZIP finetuning → %s (télécharge ce fichier depuis Kaggle)", zip_path)
 
 
 def _inject_kaggle_secrets() -> None:
@@ -336,6 +373,8 @@ def step_05_finetune(dataset: list) -> dict:
         )
 
     _save_json("kaggle_step05_finetune.json", out)
+    if run_train and out.get("training") and out["training"].get("model_path"):
+        _zip_finetune_export(out["training"]["model_path"])
     return out
 
 

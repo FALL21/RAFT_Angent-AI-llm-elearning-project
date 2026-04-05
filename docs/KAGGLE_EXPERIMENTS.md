@@ -57,6 +57,12 @@ python scripts/kaggle_full_experiment.py
 - Métadonnées : `data/evaluation/finetune_manifest.json` et `kaggle_step05_finetune.json` (champ `training` si l’entraînement a tourné).
 - **Télécharge** `models/` et les JSON depuis l’onglet *Output* ou le panneau fichiers pour les réutiliser en local.
 
+**Export ZIP (recommandé si `kaggle kernels output` / `kagglehub` renvoient 404)** : avant le script, définir `KAGGLE_ZIP_FINETUNE_EXPORT=1`. À la fin de l’étape 5, le fichier **`kaggle_finetune_export.zip`** est créé à la racine du clone (adaptateur + `finetune_manifest.json` + `kaggle_step05_finetune.json` + JSONL chat). Télécharge ce zip depuis le panneau fichiers Kaggle, puis en local :
+
+```bash
+unzip -o kaggle_finetune_export.zip -d /chemin/vers/rag-llm-elearning-project
+```
+
 ### Si mémoire GPU insuffisante (OOM)
 
 Réduire la charge dans le code (`src/config.py`, bloc `FINE_TUNING_CONFIG` → `training.batch_size`, `max_seq_length`) ou tester `FINETUNE_METHOD=lora` sur une machine avec plus de VRAM. Sur T4 16 Go, **QLoRA + Qwen2.5-7B** est en général le bon compromis.
