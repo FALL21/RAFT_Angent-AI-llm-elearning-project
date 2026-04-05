@@ -21,6 +21,24 @@ from src.config import BASE_DIR, EVALUATION_DIR, FINE_TUNING_CONFIG, MODELS_DIR
 
 logger = logging.getLogger(__name__)
 
+_BNB_QLORA_FAIL_HINT = (
+    "QLoRA (bitsandbytes 4-bit) a échoué sur ce GPU/CUDA. "
+    "Sur Kaggle, exécute avant le script : !pip install -U 'bitsandbytes>=0.45.0' "
+    "(ou une version alignée sur le CUDA du notebook). "
+    "Sinon : os.environ['FINETUNE_METHOD']='lora' (FP16, besoin de plus de VRAM) "
+    "ou FINETUNE_QLORA_FALLBACK_LORA=1 pour basculer automatiquement en LoRA."
+)
+
+
+def _is_bnb_cuda_kernel_failure(exc: BaseException) -> bool:
+    text = f"{type(exc).__name__} {exc}".lower()
+    return (
+        "no kernel image" in text
+        or "cudaerror" in text
+        or "kernel image" in text
+        or "acceleratorerror" in text
+    )
+
 
 def _finetune_device_map():
     """
@@ -303,12 +321,25 @@ class FineTuner:
         tokenizer = AutoTokenizer.from_pretrained(self.base_model_id, trust_remote_code=True)
         tokenizer.pad_token = tokenizer.eos_token
 
-        model = AutoModelForCausalLM.from_pretrained(
-            self.base_model_id,
-            quantization_config=bnb_config,
-            device_map=_finetune_device_map(),
-            trust_remote_code=True,
-        )
+        try:
+            model = AutoModelForCausalLM.from_pretrained(
+                self.base_model_id,
+                quantization_config=bnb_config,
+                device_map=_finetune_device_map(),
+                trust_remote_code=True,
+            )
+        except Exception as e:
+            if _is_bnb_cuda_kernel_failure(e) and os.getenv(
+                "FINETUNE_QLORA_FALLBACK_LORA", ""
+            ).strip().lower() in ("1", "true", "yes"):
+                logger.warning(
+                    "QLoRA indisponible sur ce runtime (%s) — repli automatique en LoRA FP16.",
+                    type(e).__name__,
+                )
+                return self.train_lora(train_dataset, eval_dataset=eval_dataset)
+            if _is_bnb_cuda_kernel_failure(e):
+                raise RuntimeError(_BNB_QLORA_FAIL_HINT) from e
+            raise
         model = prepare_model_for_kbit_training(model)
 
         peft_config = LoraConfig(

@@ -65,6 +65,22 @@ Réduire la charge dans le code (`src/config.py`, bloc `FINE_TUNING_CONFIG` → 
 
 Avec `device_map="auto"`, le modèle peut être réparti sur deux cartes et la loss PEFT/QLoRA plante (`Expected all tensors to be on the same device`). Par défaut, `src/fine_tuning.py` charge tout sur **`cuda:0`** dès qu’il détecte plusieurs GPU. Pour revenir à l’ancien comportement : `FINETUNE_DEVICE_MAP=auto` (ou `FINETUNE_MULTI_GPU=1`).
 
+### `no kernel image` / bitsandbytes (QLoRA)
+
+Si le chargement 4-bit échoue avec **`CUDA error: no kernel image is available for execution on the device`**, le paquet **bitsandbytes** livré avec l’image ne correspond pas au GPU / au CUDA du notebook.
+
+1. **Mettre à jour bitsandbytes** dans une cellule **avant** l’entraînement :
+
+```python
+!pip install -U 'bitsandbytes>=0.45.0'
+```
+
+Puis redémarrer le kernel si Kaggle le demande, ou relancer la session.
+
+2. **Sans QLoRA** : `FINETUNE_METHOD=lora` (modèle en FP16 — plus gourmand en VRAM ; réduire `batch_size` / `max_seq_length` dans `src/config.py` si OOM).
+
+3. **Repli auto** : `FINETUNE_QLORA_FALLBACK_LORA=1` avec `FINETUNE_METHOD=qlora` : en cas d’échec 4-bit, le script enchaîne en **LoRA FP16** (même dataset, adaptateur sous `models/lora/final/`).
+
 Régénérer le dataset Q/R (LLM) même si le JSON existe déjà :
 
 ```bash
